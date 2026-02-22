@@ -56,7 +56,7 @@ Response: 204 No Content
 ## Push events
 POST /api/v1/sources/{source_id}/events
 header: Authorization: Bearer {SOURCE_API_KEY}
-header: X-Source-Signature: sha256=HMAC_SHA256(secret, request_body)
+header: X-Source-Signature:  <signature> //sha256=HMAC_SHA256(secret, request_body)
 header: X-Source-Timestamp: 1705312200
 ```json
 {

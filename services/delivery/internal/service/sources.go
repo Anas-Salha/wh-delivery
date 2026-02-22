@@ -13,6 +13,7 @@ import (
 type SourceRepo interface {
 	CreateSource(ctx context.Context, source *repo.Source) error
 	GetSource(ctx context.Context, id int64) (repo.Source, error)
+	GetSourceByAPIKey(ctx context.Context, apiKey string) (repo.Source, error)
 	UpdateSource(ctx context.Context, source repo.Source) error
 	DeleteSource(ctx context.Context, id int64) error
 }
@@ -77,6 +78,10 @@ func (s *SourcesService) Update(ctx context.Context, id int64, input UpdateSourc
 
 func (s *SourcesService) Delete(ctx context.Context, id int64) error {
 	return s.repo.DeleteSource(ctx, id)
+}
+
+func (s *SourcesService) GetByAPIKey(ctx context.Context, apiKey string) (repo.Source, error) {
+	return s.repo.GetSourceByAPIKey(ctx, apiKey)
 }
 
 func (s *SourcesService) PushEvent(ctx context.Context, sourceID int64, input PushEventInput) (repo.Event, error) {

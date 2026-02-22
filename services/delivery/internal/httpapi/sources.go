@@ -17,6 +17,7 @@ type SourcesService interface {
 	Create(ctx context.Context, input service.CreateSourceInput) (repo.Source, error)
 	Update(ctx context.Context, id int64, input service.UpdateSourceInput) (repo.Source, error)
 	Delete(ctx context.Context, id int64) error
+	GetByAPIKey(ctx context.Context, apiKey string) (repo.Source, error)
 	PushEvent(ctx context.Context, sourceID int64, input service.PushEventInput) (repo.Event, error)
 }
 
@@ -33,7 +34,10 @@ func (h *SourcesHandler) Register(rg *gin.RouterGroup) {
 	rg.POST("/sources", h.createSource)
 	rg.PATCH("/sources/:source_id", h.updateSource)
 	rg.DELETE("/sources/:source_id", h.deleteSource)
-	rg.POST("/sources/:source_id/events", h.pushEvents)
+
+	events := rg.Group("/sources/:source_id/events")
+	events.Use(h.eventAuthMiddleware())
+	events.POST("", h.pushEvents)
 }
 
 func (h *SourcesHandler) createSource(c *gin.Context) {
@@ -137,6 +141,10 @@ func (h *SourcesHandler) pushEvents(c *gin.Context) {
 	}
 	if req.IdempotencyKey == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "idempotency_key is required"})
+		return
+	}
+	if req.EventType == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "event_type is required"})
 		return
 	}
 

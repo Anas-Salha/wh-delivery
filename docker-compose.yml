@@ -1,0 +1,61 @@
+services:
+  source:
+    build:
+      context: ./services/source
+    container_name: wh-source
+  auth:
+    build:
+      context: ./services/auth
+    container_name: wh-auth
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./keys/private.pem:/app/private.pem:ro
+  delivery:
+    build:
+      context: ./services/delivery
+    container_name: wh-delivery
+    environment:
+      - PORT=8080
+      - DATABASE_URL=postgres://wh_user:wh_pass@postgres:5432/wh_delivery?sslmode=disable
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+  consumer:
+    build:
+      context: ./services/consumer
+    container_name: wh-consumer
+  postgres:
+    image: postgres:16-alpine
+    container_name: wh-postgres
+    environment:
+      - POSTGRES_USER=wh_user
+      - POSTGRES_PASSWORD=wh_pass
+      - POSTGRES_DB=wh_delivery
+    ports:
+      - "5432:5432"
+    volumes:
+      - wh-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wh_user -d wh_delivery"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  migrate:
+    image: migrate/migrate:v4.17.0
+    container_name: wh-migrate
+    volumes:
+      - ./services/delivery/migrations:/migrations
+    entrypoint: ["migrate", "-path", "/migrations", "-database", "postgres://wh_user:wh_pass@postgres:5432/wh_delivery?sslmode=disable"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["up"]
+    restart: "no"
+
+volumes:
+  wh-postgres-data:

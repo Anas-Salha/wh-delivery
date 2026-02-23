@@ -148,6 +148,21 @@ func (h *SourcesHandler) pushEvents(c *gin.Context) {
 		return
 	}
 
+	sourceAny, ok := c.Get("source")
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "source context missing"})
+		return
+	}
+	source, ok := sourceAny.(repo.Source)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid source context"})
+		return
+	}
+	if !isAllowedEventType(req.EventType, source.AllowedEventTypes) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "event_type not allowed"})
+		return
+	}
+
 	sourceID, err := parseInt64Param(c.Param("source_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid source_id"})
@@ -184,4 +199,16 @@ func (h *SourcesHandler) pushEvents(c *gin.Context) {
 		ReceivedAt: event.CreatedAt.UTC().Format(time.RFC3339),
 	}
 	writeJSON(c, http.StatusAccepted, resp)
+}
+
+func isAllowedEventType(eventType string, allowed []string) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+	for _, item := range allowed {
+		if item == eventType {
+			return true
+		}
+	}
+	return false
 }

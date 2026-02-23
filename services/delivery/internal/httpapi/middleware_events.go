@@ -88,6 +88,7 @@ func (h *SourcesHandler) eventAuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		c.Set("source", source)
 		c.Next()
 	}
 }

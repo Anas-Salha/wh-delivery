@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"gorm.io/datatypes"
@@ -20,6 +21,7 @@ type SourceRepo interface {
 
 type EventRepo interface {
 	CreateEvent(ctx context.Context, event *repo.Event) error
+	GetEventByIdempotencyKey(ctx context.Context, sourceID int64, key string) (repo.Event, error)
 }
 
 type SourcesService struct {
@@ -105,6 +107,13 @@ func (s *SourcesService) PushEvent(ctx context.Context, sourceID int64, input Pu
 	}
 
 	if err := s.eventRepo.CreateEvent(ctx, &event); err != nil {
+		if errors.Is(err, repo.ErrConflict) {
+			existing, getErr := s.eventRepo.GetEventByIdempotencyKey(ctx, sourceID, input.IdempotencyKey)
+			if getErr != nil {
+				return repo.Event{}, getErr
+			}
+			return existing, nil
+		}
 		return repo.Event{}, err
 	}
 

@@ -6,10 +6,13 @@ import (
 	"log"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
 
 var ErrNotFound = errors.New("not found")
+var ErrConflict = errors.New("conflict")
 
 type Postgres struct {
 	db *gorm.DB
@@ -86,13 +89,32 @@ func (p *Postgres) DeleteWebhook(ctx context.Context, id int64) error {
 
 func (p *Postgres) CreateEvent(ctx context.Context, event *Event) error {
 	log.Printf("[repo] CreateEvent source_id=%d event_type=%s", event.SourceID, event.EventType)
-	return p.db.WithContext(ctx).Create(event).Error
+	if err := p.db.WithContext(ctx).Create(event).Error; err != nil {
+		if isUniqueViolation(err) {
+			return ErrConflict
+		}
+		return err
+	}
+	return nil
 }
 
 func (p *Postgres) GetEvent(ctx context.Context, id int64) (Event, error) {
 	log.Printf("[repo] GetEvent id=%d", id)
 	var event Event
 	if err := p.db.WithContext(ctx).First(&event, "id = ?", id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return Event{}, ErrNotFound
+		}
+		return Event{}, err
+	}
+	return event, nil
+}
+
+func (p *Postgres) GetEventByIdempotencyKey(ctx context.Context, sourceID int64, key string) (Event, error) {
+	log.Printf("[repo] GetEventByIdempotencyKey source_id=%d", sourceID)
+	var event Event
+	if err := p.db.WithContext(ctx).
+		First(&event, "source_id = ? AND idempotency_key = ?", sourceID, key).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return Event{}, ErrNotFound
 		}
@@ -190,4 +212,19 @@ func (p *Postgres) DeleteSource(ctx context.Context, id int64) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+func isUniqueViolation(err error) bool {
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return true
+	}
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) {
+		return string(pqErr.Code) == "23505"
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23505"
+	}
+	return false
 }

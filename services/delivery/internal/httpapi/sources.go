@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"crypto/rsa"
 	"errors"
 	"fmt"
 	"net/http"
@@ -24,16 +25,23 @@ type SourcesService interface {
 type SourcesHandler struct {
 	serviceName string
 	svc         SourcesService
+	adminPublicKey *rsa.PublicKey
 }
 
-func NewSourcesHandler(serviceName string, svc SourcesService) *SourcesHandler {
-	return &SourcesHandler{serviceName: serviceName, svc: svc}
+func NewSourcesHandler(serviceName string, svc SourcesService, adminPublicKey *rsa.PublicKey) *SourcesHandler {
+	return &SourcesHandler{
+		serviceName:    serviceName,
+		svc:            svc,
+		adminPublicKey: adminPublicKey,
+	}
 }
 
 func (h *SourcesHandler) Register(rg *gin.RouterGroup) {
-	rg.POST("/sources", h.createSource)
-	rg.PATCH("/sources/:source_id", h.updateSource)
-	rg.DELETE("/sources/:source_id", h.deleteSource)
+	admin := rg.Group("")
+	admin.Use(h.adminAuthMiddleware())
+	admin.POST("/sources", h.createSource)
+	admin.PATCH("/sources/:source_id", h.updateSource)
+	admin.DELETE("/sources/:source_id", h.deleteSource)
 
 	events := rg.Group("/sources/:source_id/events")
 	events.Use(h.eventAuthMiddleware())

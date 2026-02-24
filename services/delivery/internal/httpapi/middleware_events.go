@@ -93,22 +93,6 @@ func (h *SourcesHandler) eventAuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-func parseBearerToken(header string) (string, bool) {
-	header = strings.TrimSpace(header)
-	if header == "" {
-		return "", false
-	}
-	const prefix = "Bearer "
-	if !strings.HasPrefix(header, prefix) {
-		return "", false
-	}
-	token := strings.TrimSpace(strings.TrimPrefix(header, prefix))
-	if token == "" {
-		return "", false
-	}
-	return token, true
-}
-
 func validSourceSignature(header, secret string, body []byte) bool {
 	expected := computeHMACSHA256(secret, body)
 	signature := strings.TrimSpace(header)

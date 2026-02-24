@@ -20,6 +20,8 @@ services:
       - DATABASE_URL=postgres://wh_user:wh_pass@postgres:5432/wh_delivery?sslmode=disable
     ports:
       - "8080:8080"
+    volumes:
+      - ./keys/public.pem:/app/keys/public.pem:ro
     depends_on:
       postgres:
         condition: service_healthy

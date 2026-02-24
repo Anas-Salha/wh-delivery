@@ -19,6 +19,11 @@ type Services struct {
 }
 
 func Run(cfg config.Config, services Services) error {
+	adminPublicKey, err := loadPublicKey(cfg.AdminJWTPublicKeyPath)
+	if err != nil {
+		return fmt.Errorf("failed to load admin JWT public key: %w", err)
+	}
+
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
@@ -34,7 +39,7 @@ func Run(cfg config.Config, services Services) error {
 
 	api := router.Group("/api/v1")
 	NewWebhooksHandler(cfg.ServiceName, services.Webhooks).Register(api)
-	NewSourcesHandler(cfg.ServiceName, services.Sources).Register(api)
+	NewSourcesHandler(cfg.ServiceName, services.Sources, adminPublicKey).Register(api)
 
 	addr := ":" + cfg.Port
 	log.Printf("[%s] starting HTTP server on %s", cfg.ServiceName, addr)

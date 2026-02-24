@@ -27,12 +27,12 @@ func loadPrivateKey(path string) (*rsa.PrivateKey, error) {
 	return jwt.ParseRSAPrivateKeyFromPEM(b)
 }
 
-func issueAdminToken(adminUserID string) (string, error) {
+func issueToken(userID string, roles []string) (string, error) {
 	now := time.Now()
 
 	claims := CustomClaims{
-		Sub:   adminUserID,
-		Roles: []string{"admin"},
+		Sub:   userID,
+		Roles: roles,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    "auth-service",
 			Audience:  []string{"delivery-service"},
@@ -75,7 +75,34 @@ func main() {
 			return
 		}
 
-		token, err := issueAdminToken("admin-1")
+		token, err := issueToken("admin-1", []string{"admin"})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not issue token"})
+			return
+		}
+
+		c.JSON(200, gin.H{
+			"access_token": token,
+			"token_type":   "Bearer",
+			"expires_in":   900,
+		})
+	})
+
+	// Demo: user login -> non-admin JWT for webhook-delivery-service
+	r.POST("/user/login", func(c *gin.Context) {
+		var req loginReq
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "bad json"})
+			return
+		}
+
+		// Demo credentials check (replace with DB lookup + password hash verify)
+		if req.Username != "user" || req.Password != "user123" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+			return
+		}
+
+		token, err := issueToken("user-1", []string{"user"})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not issue token"})
 			return

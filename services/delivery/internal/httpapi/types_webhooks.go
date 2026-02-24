@@ -3,7 +3,6 @@ package httpapi
 type CreateWebhookRequest struct {
 	CallbackURL       string         `json:"callback_url"`
 	EventTypes        []string       `json:"event_types"`
-	TriggerConditions map[string]any `json:"trigger_conditions"`
 	RetryConfig       map[string]any `json:"retry_config"`
 	RateLimit         map[string]any `json:"rate_limit"`
 }

@@ -4,14 +4,8 @@ POST /api/v1/webhooks
 header: Authorization: Bearer {JWT_TOKEN}
 ```json
 {
-	"callback_url": "string (required, must be HTTPS)"
+	"callback_url": "string (required, must be HTTPS)",
 	"event_types": ["string"] (optional, e.g., ["payment_success", "order_updated"])
-	"trigger_conditions": {
-		"filters": {
-			"amount_gt": 1000,
-			"currency": "USD"
-		}
-	},
 	"retry_config": {
 		"max_retries": 5,
 		"initial_delay_ms": 1000,

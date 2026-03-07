@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"time"
 
 	"gorm.io/datatypes"
@@ -26,6 +27,14 @@ func NewWebhooksService(repo WebhookRepo) *WebhooksService {
 }
 
 func (s *WebhooksService) Create(ctx context.Context, input CreateWebhookInput) (repo.Webhook, error) {
+	log.Printf(
+		"[service] WebhooksService.Create client_id=%d callback_url=%q event_types=%v signing_secret=%q status=%q",
+		input.ClientID,
+		input.CallbackURL,
+		input.EventTypes,
+		redactValue(input.SigningSecret),
+		input.Status,
+	)
 	if input.ClientID == 0 {
 		input.ClientID = 1
 	}
@@ -65,6 +74,13 @@ func (s *WebhooksService) Create(ctx context.Context, input CreateWebhookInput) 
 }
 
 func (s *WebhooksService) Update(ctx context.Context, id int64, input UpdateWebhookInput) (repo.Webhook, error) {
+	log.Printf(
+		"[service] WebhooksService.Update webhook_id=%d callback_url=%q event_types=%v status=%q",
+		id,
+		input.CallbackURL,
+		input.EventTypes,
+		input.Status,
+	)
 	current, err := s.repo.GetWebhook(ctx, id)
 	if err != nil {
 		return repo.Webhook{}, err
@@ -97,5 +113,6 @@ func (s *WebhooksService) Update(ctx context.Context, id int64, input UpdateWebh
 }
 
 func (s *WebhooksService) Delete(ctx context.Context, id int64) error {
+	log.Printf("[service] WebhooksService.Delete webhook_id=%d", id)
 	return s.repo.DeleteWebhook(ctx, id)
 }

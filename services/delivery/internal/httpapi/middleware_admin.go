@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"log"
 	"net/http"
 	"slices"
 
@@ -15,6 +16,7 @@ type AdminClaims struct {
 
 func (h *SourcesHandler) adminAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		log.Printf("[httpapi] adminAuthMiddleware path=%s", c.Request.URL.Path)
 		if h.adminPublicKey == nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "admin auth not configured"})
 			c.Abort()
@@ -23,6 +25,7 @@ func (h *SourcesHandler) adminAuthMiddleware() gin.HandlerFunc {
 
 		tokenString, ok := parseBearerToken(c.GetHeader("Authorization"))
 		if !ok {
+			log.Printf("[httpapi] adminAuthMiddleware missing bearer token")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing or invalid authorization"})
 			c.Abort()
 			return
@@ -43,17 +46,20 @@ func (h *SourcesHandler) adminAuthMiddleware() gin.HandlerFunc {
 			jwt.WithAudience("delivery-service"),
 		)
 		if err != nil || token == nil || !token.Valid {
+			log.Printf("[httpapi] adminAuthMiddleware invalid token err=%v", err)
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
 			c.Abort()
 			return
 		}
 
 		if !slices.Contains(claims.Roles, "admin") {
+			log.Printf("[httpapi] adminAuthMiddleware forbidden roles=%v", claims.Roles)
 			c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
 			c.Abort()
 			return
 		}
 
+		log.Printf("[httpapi] adminAuthMiddleware authorized sub=%q roles=%v", claims.Subject, claims.Roles)
 		c.Set("admin_claims", claims)
 		c.Next()
 	}

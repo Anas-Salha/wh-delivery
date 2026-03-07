@@ -1,8 +1,4 @@
 services:
-  source:
-    build:
-      context: ./services/source
-    container_name: wh-source
   auth:
     build:
       context: ./services/auth

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"time"
 
 	"gorm.io/datatypes"
@@ -34,6 +35,14 @@ func NewSourcesService(repo SourceRepo, eventRepo EventRepo) *SourcesService {
 }
 
 func (s *SourcesService) Create(ctx context.Context, input CreateSourceInput) (repo.Source, error) {
+	log.Printf(
+		"[service] SourcesService.Create source_name=%q api_key=%q webhook_secret=%q allowed_event_types=%v status=%q",
+		input.SourceName,
+		redactValue(input.APIKey),
+		redactValue(input.WebhookSecret),
+		input.AllowedEventTypes,
+		input.Status,
+	)
 	if input.Status == "" {
 		input.Status = "active"
 	}
@@ -57,6 +66,12 @@ func (s *SourcesService) Create(ctx context.Context, input CreateSourceInput) (r
 }
 
 func (s *SourcesService) Update(ctx context.Context, id int64, input UpdateSourceInput) (repo.Source, error) {
+	log.Printf(
+		"[service] SourcesService.Update source_id=%d status=%q allowed_event_types=%v",
+		id,
+		input.Status,
+		input.AllowedEventTypes,
+	)
 	current, err := s.repo.GetSource(ctx, id)
 	if err != nil {
 		return repo.Source{}, err
@@ -79,14 +94,23 @@ func (s *SourcesService) Update(ctx context.Context, id int64, input UpdateSourc
 }
 
 func (s *SourcesService) Delete(ctx context.Context, id int64) error {
+	log.Printf("[service] SourcesService.Delete source_id=%d", id)
 	return s.repo.DeleteSource(ctx, id)
 }
 
 func (s *SourcesService) GetByAPIKey(ctx context.Context, apiKey string) (repo.Source, error) {
+	log.Printf("[service] SourcesService.GetByAPIKey api_key=%q", redactValue(apiKey))
 	return s.repo.GetSourceByAPIKey(ctx, apiKey)
 }
 
 func (s *SourcesService) PushEvent(ctx context.Context, sourceID int64, input PushEventInput) (repo.Event, error) {
+	log.Printf(
+		"[service] SourcesService.PushEvent source_id=%d idempotency_key=%q event_type=%q occurred_at=%q",
+		sourceID,
+		input.IdempotencyKey,
+		input.EventType,
+		input.OccurredAt,
+	)
 	payload := map[string]any{
 		"occurred_at": input.OccurredAt,
 		"data":        input.Data,

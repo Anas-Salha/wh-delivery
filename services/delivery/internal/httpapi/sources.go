@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -23,8 +24,8 @@ type SourcesService interface {
 }
 
 type SourcesHandler struct {
-	serviceName string
-	svc         SourcesService
+	serviceName    string
+	svc            SourcesService
 	adminPublicKey *rsa.PublicKey
 }
 
@@ -51,9 +52,17 @@ func (h *SourcesHandler) Register(rg *gin.RouterGroup) {
 func (h *SourcesHandler) createSource(c *gin.Context) {
 	var req CreateSourceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("[httpapi] createSource bind error=%v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
 		return
 	}
+	log.Printf(
+		"[httpapi] createSource source_name=%q api_key=%q webhook_secret=%q allowed_event_types=%v",
+		req.SourceName,
+		redactValue(req.APIKey),
+		redactValue(req.WebhookSecret),
+		req.AllowedEventTypes,
+	)
 
 	input := service.CreateSourceInput{
 		SourceName:        req.SourceName,
@@ -85,15 +94,23 @@ func (h *SourcesHandler) createSource(c *gin.Context) {
 func (h *SourcesHandler) updateSource(c *gin.Context) {
 	var req UpdateSourceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("[httpapi] updateSource bind error=%v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
 		return
 	}
 
 	sourceID, err := parseInt64Param(c.Param("source_id"))
 	if err != nil {
+		log.Printf("[httpapi] updateSource invalid source_id=%q", c.Param("source_id"))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid source_id"})
 		return
 	}
+	log.Printf(
+		"[httpapi] updateSource source_id=%d status=%q allowed_event_types=%v",
+		sourceID,
+		req.Status,
+		req.AllowedEventTypes,
+	)
 
 	input := service.UpdateSourceInput{
 		Status:            req.Status,
@@ -124,9 +141,11 @@ func (h *SourcesHandler) updateSource(c *gin.Context) {
 func (h *SourcesHandler) deleteSource(c *gin.Context) {
 	sourceID, err := parseInt64Param(c.Param("source_id"))
 	if err != nil {
+		log.Printf("[httpapi] deleteSource invalid source_id=%q", c.Param("source_id"))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid source_id"})
 		return
 	}
+	log.Printf("[httpapi] deleteSource source_id=%d", sourceID)
 
 	if err := h.svc.Delete(c.Request.Context(), sourceID); err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
@@ -144,14 +163,17 @@ func (h *SourcesHandler) deleteSource(c *gin.Context) {
 func (h *SourcesHandler) pushEvents(c *gin.Context) {
 	var req PushEventRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("[httpapi] pushEvents bind error=%v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
 		return
 	}
 	if req.IdempotencyKey == "" {
+		log.Printf("[httpapi] pushEvents missing idempotency_key")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "idempotency_key is required"})
 		return
 	}
 	if req.EventType == "" {
+		log.Printf("[httpapi] pushEvents missing event_type")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "event_type is required"})
 		return
 	}
@@ -163,19 +185,28 @@ func (h *SourcesHandler) pushEvents(c *gin.Context) {
 	}
 	source, ok := sourceAny.(repo.Source)
 	if !ok {
+		log.Printf("[httpapi] pushEvents invalid source context type=%T", sourceAny)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid source context"})
 		return
 	}
 	if !isAllowedEventType(req.EventType, source.AllowedEventTypes) {
+		log.Printf("[httpapi] pushEvents disallowed event_type=%q source_id=%d", req.EventType, source.ID)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "event_type not allowed"})
 		return
 	}
 
 	sourceID, err := parseInt64Param(c.Param("source_id"))
 	if err != nil {
+		log.Printf("[httpapi] pushEvents invalid source_id=%q", c.Param("source_id"))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid source_id"})
 		return
 	}
+	log.Printf(
+		"[httpapi] pushEvents source_id=%d event_type=%q idempotency_key=%q",
+		sourceID,
+		req.EventType,
+		req.IdempotencyKey,
+	)
 
 	input := service.PushEventInput{
 		IdempotencyKey: req.IdempotencyKey,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -38,9 +39,16 @@ func (h *WebhooksHandler) Register(rg *gin.RouterGroup) {
 func (h *WebhooksHandler) createWebhook(c *gin.Context) {
 	var req CreateWebhookRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("[httpapi] createWebhook bind error=%v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
 		return
 	}
+	log.Printf(
+		"[httpapi] createWebhook callback_url=%q event_types=%v retry_config=%v",
+		req.CallbackURL,
+		req.EventTypes,
+		req.RetryConfig,
+	)
 
 	input := service.CreateWebhookInput{
 		CallbackURL:   req.CallbackURL,
@@ -72,15 +80,24 @@ func (h *WebhooksHandler) createWebhook(c *gin.Context) {
 func (h *WebhooksHandler) updateWebhook(c *gin.Context) {
 	var req UpdateWebhookRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("[httpapi] updateWebhook bind error=%v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
 		return
 	}
 
 	webhookID, err := parseInt64Param(c.Param("webhook_id"))
 	if err != nil {
+		log.Printf("[httpapi] updateWebhook invalid webhook_id=%q", c.Param("webhook_id"))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid webhook_id"})
 		return
 	}
+	log.Printf(
+		"[httpapi] updateWebhook webhook_id=%d callback_url=%q event_types=%v status=%q",
+		webhookID,
+		req.CallbackURL,
+		req.EventTypes,
+		req.Status,
+	)
 
 	input := service.UpdateWebhookInput{
 		CallbackURL: req.CallbackURL,
@@ -112,9 +129,11 @@ func (h *WebhooksHandler) updateWebhook(c *gin.Context) {
 func (h *WebhooksHandler) deleteWebhook(c *gin.Context) {
 	webhookID, err := parseInt64Param(c.Param("webhook_id"))
 	if err != nil {
+		log.Printf("[httpapi] deleteWebhook invalid webhook_id=%q", c.Param("webhook_id"))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid webhook_id"})
 		return
 	}
+	log.Printf("[httpapi] deleteWebhook webhook_id=%d", webhookID)
 
 	if err := h.svc.Delete(c.Request.Context(), webhookID); err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
